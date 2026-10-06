@@ -5,6 +5,15 @@ window.PFC_CONFIG = {
   DEPARTMENT: "PFC",
   TASK_HANDLED_BY: "IWS",
   DEFAULT_STATUS: "COMPLETED",
-  // Optional Gmail search restriction. Leave blank to use all mail in the selected month.
-  EXTRA_GMAIL_QUERY: ""
+
+  // Extra Gmail search terms, if you want to narrow the search further.
+  // Example: from:(person1@example.com OR person2@example.com)
+  EXTRA_GMAIL_QUERY: "",
+
+  // Gmail categories that are never imported as tasks.
+  EXCLUDED_LABELS: [
+    "CATEGORY_PROMOTIONS",
+    "CATEGORY_SOCIAL",
+    "CATEGORY_FORUMS"
+  ]
 };
