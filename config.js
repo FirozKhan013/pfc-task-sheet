@@ -1,7 +1,7 @@
 // Paste your Google Cloud OAuth 2.0 "Web application" Client ID here.
 // Example: 123456789012-abcdefg123456789.apps.googleusercontent.com
 window.PFC_CONFIG = {
-  GOOGLE_CLIENT_ID: "PASTE_YOUR_WEB_CLIENT_ID_HERE",
+  GOOGLE_CLIENT_ID: "149746848833-7of4sno2qvhbaqajna9n11020bhqefao.apps.googleusercontent.com",
   DEPARTMENT: "PFC",
   TASK_HANDLED_BY: "IWS",
   DEFAULT_STATUS: "COMPLETED",
