@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PFC Gmail Task Sheet Generator</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+</head>
+<body>
+  <main class="card">
+    <h1>PFC Task Sheet Generator</h1>
+    <p class="muted">Read selected-month Gmail messages and create your PFC Excel task sheet.</p>
+
+    <section class="controls">
+      <label>Month
+        <select id="month"></select>
+      </label>
+      <label>Year
+        <select id="year"></select>
+      </label>
+      <button id="generate">Generate Excel</button>
+    </section>
+
+    <div id="status" class="status">Ready.</div>
+    <div id="progress" class="progress"><div id="bar"></div></div>
+
+    <div class="settings-note">
+      <b>One-time setup:</b> put your Google OAuth Web Client ID in <code>config.js</code> before publishing to GitHub Pages.
+      Your Gmail data is processed in your browser; this app has no backend.
+    </div>
+  </main>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
