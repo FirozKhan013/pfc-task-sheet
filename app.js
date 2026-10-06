@@ -41,7 +41,7 @@ function initGoogle(){
 }
 
 async function gmail(path, options={}){
-  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{...options,headers:{...(options.headers||{}),Authorization:'Bearer '+accessToken}});
+  const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{...options,headers:{...(options.headers||{}),Authorization:'Bearer '+accessToken}});
   if(!r.ok){ const t=await r.text(); throw new Error(`Gmail API ${r.status}: ${t}`); }
   return r.json();
 }
@@ -82,18 +82,41 @@ function bodyText(payload){
 
 function classify(text){
   const t=text.toLowerCase();
-  if(/\b(error|issue|problem|failed|failure|not working|incorrect|wrong|exception|unable|does not|not showing|mismatch|bug)\b/.test(t)) return 'ERROR RECTIFICATION';
-  if(/\b(develop|development|new module|new screen|new functionality|new feature)\b/.test(t)) return 'DEVELOPMENT';
+  if(/\b(error|issue|problem|failed|failure|not working|incorrect|wrong|exception|unable|does not|not showing|mismatch|bug|discrepancy|difference)\b/.test(t)) return 'ERROR RECTIFICATION';
+  if(/\b(develop|development|new module|new screen|new functionality|new feature|create a module|create a screen)\b/.test(t)) return 'DEVELOPMENT';
   return 'MODIFICATION';
 }
+
 function cleanTask(subject, body){
   let s=(subject||'').replace(/^(re|fw|fwd):\s*/ig,'').trim();
   if(!s || s.length<5) s=body.slice(0,180);
   return s.replace(/\s+/g,' ').trim();
 }
+
 function parseSender(from){
-  const m=from.match(/^\s*([^<]+)\s*<[^>]+>/); return (m?m[1]:from).replace(/"/g,'').trim();
+  const m=from.match(/^\s*([^<]+)\s*<[^>]+>/);
+  return (m?m[1]:from).replace(/"/g,'').trim();
 }
+
+// Many of your work emails are forwarded. In those emails, the Gmail sender can
+// be different from the person who originally raised the task. Try to recover
+// the original From/Subject from the forwarded content.
+function extractForwardedDetails(body){
+  const result={originalFrom:'', originalSubject:''};
+  if(!body) return result;
+
+  const fromMatch=body.match(/(?:^|\s)(?:From|De|Von|发件人)\s*:\s*([^\n\r]+?)(?=\s+(?:Sent|Date|To|Cc|Subject|Asunto|\n)\s*:|$)/i);
+  const subjectMatch=body.match(/(?:^|\s)(?:Subject|Asunto)\s*:\s*([^\n\r]+)/i);
+  if(fromMatch) result.originalFrom=fromMatch[1].trim();
+  if(subjectMatch) result.originalSubject=subjectMatch[1].trim();
+  return result;
+}
+
+function isExcludedMessage(msg){
+  const excluded=cfg.EXCLUDED_LABELS || ['CATEGORY_PROMOTIONS','CATEGORY_SOCIAL','CATEGORY_FORUMS'];
+  return (msg.labelIds||[]).some(x=>excluded.includes(x));
+}
+
 function fmtDate(d){ const x=new Date(d); return `${pad(x.getDate())}-${pad(x.getMonth()+1)}-${x.getFullYear()}`; }
 
 async function generate(){
@@ -102,30 +125,63 @@ async function generate(){
   const after=`${year}/${pad(month)}/01`;
   const next=new Date(year,month,1);
   const before=`${next.getFullYear()}/${pad(next.getMonth()+1)}/01`;
-  let q=`after:${after} before:${before}`;
+
+  // Gmail's category filters remove common promotional/social mail before we
+  // download full messages. We deliberately do NOT exclude CATEGORY_UPDATES,
+  // because genuine work mail can be classified by Gmail as Updates.
+  let q=`after:${after} before:${before} -category:promotions -category:social -category:forums`;
   if(cfg.EXTRA_GMAIL_QUERY) q+=' '+cfg.EXTRA_GMAIL_QUERY;
+
   try{
-    setStatus('Searching Gmail...');
+    setStatus('Searching Gmail for work emails...');
     const ids=await listMessages(q);
-    if(!ids.length){ setStatus('No Gmail messages found for this month.'); setProgress(100); return; }
+    if(!ids.length){ setStatus('No work emails found for this month.'); setProgress(100); return; }
+
     const rows=[];
     const seen=new Set();
+    let skippedCategories=0;
+
     for(let i=0;i<ids.length;i++){
-      setStatus(`Reading email ${i+1} of ${ids.length}...`); setProgress(10+Math.round((i/ids.length)*75));
+      setStatus(`Checking email ${i+1} of ${ids.length}...`);
+      setProgress(10+Math.round((i/ids.length)*75));
+
       const msg=await gmail(`messages/${ids[i].id}?format=full`);
+      if(isExcludedMessage(msg)){ skippedCategories++; continue; }
+
       const h=msg.payload?.headers||[];
       const date=header(h,'Date'), from=header(h,'From'), subject=header(h,'Subject');
       const key=msg.id;
-      if(seen.has(key)) continue; seen.add(key);
+      if(seen.has(key)) continue;
+      seen.add(key);
+
       const body=bodyText(msg.payload);
-      const task=cleanTask(subject,body);
-      rows.push({task, requirementBy:parseSender(from), department:cfg.DEPARTMENT||'PFC', taskDate:new Date(date), status:cfg.DEFAULT_STATUS||'COMPLETED', completionDate:'', handledBy:cfg.TASK_HANDLED_BY||'IWS', taskType:classify(subject+' '+body)});
+      const forwarded=extractForwardedDetails(body);
+      const originalFrom=forwarded.originalFrom || from;
+      const originalSubject=forwarded.originalSubject || subject;
+      const task=cleanTask(originalSubject,body);
+
+      // Task date stays the date of the email in your mailbox. This avoids
+      // moving an October forwarded task into an older month just because the
+      // original message was sent earlier.
+      rows.push({
+        task,
+        requirementBy:parseSender(originalFrom),
+        department:cfg.DEPARTMENT||'PFC',
+        taskDate:new Date(date),
+        status:cfg.DEFAULT_STATUS||'COMPLETED',
+        completionDate:'',
+        handledBy:cfg.TASK_HANDLED_BY||'IWS',
+        taskType:classify(originalSubject+' '+body)
+      });
     }
+
     rows.sort((a,b)=>a.taskDate-b.taskDate);
     await createWorkbook(rows,month,year);
-    setProgress(100); setStatus(`Done. ${rows.length} tasks exported.`);
-  }catch(e){ console.error(e); setStatus(e.message||String(e)); setProgress(0); }
-  finally{ $('generate').disabled=false; }
+    setProgress(100);
+    setStatus(`Done. ${rows.length} work tasks exported${skippedCategories ? ` (${skippedCategories} promotional/social emails skipped)` : ''}.`);
+  }catch(e){
+    console.error(e); setStatus(e.message||String(e)); setProgress(0);
+  }finally{ $('generate').disabled=false; }
 }
 
 async function createWorkbook(rows,month,year){
