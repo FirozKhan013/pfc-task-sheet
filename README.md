@@ -1,69 +1,36 @@
 # PFC Gmail Task Sheet Generator
 
-A static GitHub Pages web app that reads a selected month's Gmail messages and creates an Excel PFC task sheet in the browser.
+A browser-only GitHub Pages app that reads a selected month's Gmail work emails and creates an Excel PFC task sheet.
 
-## What you get
+## What it does
 
-- Month/year dropdowns
-- Google Gmail OAuth sign-in
-- Reads Gmail using `gmail.readonly`
-- Searches only the selected month
-- Extracts sender, date, subject/body
-- Classifies task type using simple rules
-- Generates `.xlsx` in the browser
-- No backend and no database
-- Gmail access token stays in the browser
+- Select month and year.
+- Sign in with Google using Gmail OAuth.
+- Searches only the selected month.
+- Excludes Gmail Promotions, Social and Forums categories.
+- Keeps Updates because genuine work mail can be placed there by Gmail.
+- Handles forwarded work emails by trying to extract the original `From:` and `Subject:` from the forwarded content.
+- Uses the mailbox email date as the task date.
+- Classifies tasks as `ERROR RECTIFICATION`, `DEVELOPMENT`, or `MODIFICATION` using simple rules.
+- Generates `.xlsx` directly in the browser.
+- No backend/database.
 
-## One-time Google setup
+## Setup
 
-1. Open Google Cloud Console: https://console.cloud.google.com/
-2. Create a project.
-3. Enable **Gmail API**.
-4. Configure the OAuth consent screen. For a personal/testing app, use External and add your own Gmail account as a test user if Google asks.
-5. Create **OAuth Client ID → Web application**.
-6. Add your GitHub Pages origin under **Authorized JavaScript origins**, for example:
-   `https://YOUR-USERNAME.github.io`
-   If the repository is a project site, the origin is still only `https://YOUR-USERNAME.github.io`.
-7. Copy the Web Client ID.
-8. Put it in `config.js`:
+1. Enable Gmail API in Google Cloud.
+2. Configure OAuth branding/audience.
+3. Create a **Web application** OAuth client.
+4. Add your GitHub Pages origin under **Authorized JavaScript origins**, e.g. `https://YOUR-USERNAME.github.io`.
+5. Put the Web Client ID in `config.js`.
+6. Add your Google account as a test user if the OAuth app is in Testing.
+7. Publish the repository with GitHub Pages.
+
+## Optional filtering
+
+`config.js` contains `EXTRA_GMAIL_QUERY` if you later want to restrict by sender, subject, etc. Example:
 
 ```js
-window.PFC_CONFIG = {
-  GOOGLE_CLIENT_ID: "YOUR_CLIENT_ID.apps.googleusercontent.com",
-  DEPARTMENT: "PFC",
-  TASK_HANDLED_BY: "IWS",
-  DEFAULT_STATUS: "COMPLETED",
-  EXTRA_GMAIL_QUERY: ""
-};
+EXTRA_GMAIL_QUERY: 'from:(person1@example.com OR person2@example.com)'
 ```
 
-Do not put a client secret in this project. A browser app uses the OAuth Web Client ID and Google's token flow.
-
-## Publish to GitHub Pages
-
-1. Create a new GitHub repository.
-2. Upload all files from this folder.
-3. Commit/push.
-4. Repository → Settings → Pages → Deploy from branch → `main` → `/root` → Save.
-5. Open the generated GitHub Pages URL.
-6. Select month/year → **Generate Excel** → sign in with Gmail → allow read-only Gmail access.
-
-## Important
-
-This project intentionally requests only `https://www.googleapis.com/auth/gmail.readonly`. It does not send, delete, or modify email.
-
-The app reads the subject and body because the task description and task type may need the email content. Everything is processed client-side.
-
-The default task rules are intentionally simple. Edit `classify()` and `cleanTask()` in `app.js` to match your organization's exact email wording.
-
-## Current Excel columns
-
-1. Sl.No
-2. TASK
-3. Requirement By
-4. Department
-5. Task Date
-6. Status
-7. Completion Date
-8. Task Handled By
-9. Task Type
+Do not put a Google client secret in this repository.
